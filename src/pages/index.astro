@@ -1,0 +1,290 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Todo App">
+  <main class="container mx-auto px-4 py-8 max-w-2xl">
+    <header class="text-center mb-8">
+      <h1 class="text-5xl font-bold text-white drop-shadow-lg mb-2">
+        Todo List
+      </h1>
+      <p class="text-white/80 text-lg">Stay organized, stay colorful</p>
+    </header>
+
+    <div class="bg-white/20 backdrop-blur-lg rounded-3xl p-6 shadow-2xl border border-white/30">
+      <form id="todo-form" class="flex gap-3 mb-6">
+        <input
+          type="text"
+          id="todo-input"
+          placeholder="What needs to be done?"
+          class="flex-1 px-5 py-3 rounded-xl bg-white/90 text-gray-800 placeholder-gray-500
+                 focus:outline-none focus:ring-4 focus:ring-yellow-300 transition-all
+                 shadow-inner text-lg"
+        />
+        <button
+          type="submit"
+          class="px-6 py-3 bg-gradient-to-r from-green-400 to-cyan-400 text-white font-bold
+                 rounded-xl hover:from-green-500 hover:to-cyan-500 transition-all
+                 hover:scale-105 active:scale-95 shadow-lg"
+        >
+          Add
+        </button>
+      </form>
+
+      <div id="filters" class="flex gap-2 mb-6 justify-center flex-wrap">
+        <button
+          data-filter="all"
+          class="filter-btn px-4 py-2 rounded-full bg-white/30 text-white font-medium
+                 hover:bg-white/50 transition-all active"
+        >
+          All
+        </button>
+        <button
+          data-filter="active"
+          class="filter-btn px-4 py-2 rounded-full bg-white/30 text-white font-medium
+                 hover:bg-white/50 transition-all"
+        >
+          Active
+        </button>
+        <button
+          data-filter="completed"
+          class="filter-btn px-4 py-2 rounded-full bg-white/30 text-white font-medium
+                 hover:bg-white/50 transition-all"
+        >
+          Completed
+        </button>
+      </div>
+
+      <ul id="todo-list" class="space-y-3">
+        <!-- Todos will be rendered here -->
+      </ul>
+
+      <div id="empty-state" class="text-center py-12 text-white/70">
+        <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+        <p class="text-lg">No todos yet. Add one above!</p>
+      </div>
+
+      <footer id="todo-footer" class="hidden mt-6 pt-4 border-t border-white/20 flex justify-between items-center text-white/80">
+        <span id="items-left">0 items left</span>
+        <button
+          id="clear-completed"
+          class="text-sm hover:text-white transition-colors underline"
+        >
+          Clear completed
+        </button>
+      </footer>
+    </div>
+
+    <footer class="text-center mt-8 text-white/60 text-sm">
+      <p>Built with Astro + Tailwind CSS</p>
+    </footer>
+  </main>
+</Layout>
+
+<style>
+  .filter-btn.active {
+    background: linear-gradient(135deg, #fbbf24, #f97316);
+    color: white;
+  }
+
+  .todo-item {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .todo-item.removing {
+    animation: slideOut 0.3s ease-in forwards;
+  }
+
+  @keyframes slideOut {
+    to {
+      opacity: 0;
+      transform: translateX(100px);
+    }
+  }
+</style>
+
+<script>
+  interface Todo {
+    id: string;
+    text: string;
+    completed: boolean;
+    color: string;
+  }
+
+  const colors = [
+    'from-pink-400 to-rose-400',
+    'from-purple-400 to-indigo-400',
+    'from-blue-400 to-cyan-400',
+    'from-teal-400 to-green-400',
+    'from-yellow-400 to-orange-400',
+    'from-orange-400 to-red-400',
+  ];
+
+  let todos: Todo[] = JSON.parse(localStorage.getItem('todos') || '[]');
+  let filter: 'all' | 'active' | 'completed' = 'all';
+
+  const form = document.getElementById('todo-form') as HTMLFormElement;
+  const input = document.getElementById('todo-input') as HTMLInputElement;
+  const list = document.getElementById('todo-list') as HTMLUListElement;
+  const emptyState = document.getElementById('empty-state') as HTMLDivElement;
+  const footer = document.getElementById('todo-footer') as HTMLElement;
+  const itemsLeft = document.getElementById('items-left') as HTMLSpanElement;
+  const clearBtn = document.getElementById('clear-completed') as HTMLButtonElement;
+  const filterBtns = document.querySelectorAll('.filter-btn');
+
+  function getRandomColor(): string {
+    return colors[Math.floor(Math.random() * colors.length)];
+  }
+
+  function saveTodos(): void {
+    localStorage.setItem('todos', JSON.stringify(todos));
+  }
+
+  function getFilteredTodos(): Todo[] {
+    switch (filter) {
+      case 'active':
+        return todos.filter(t => !t.completed);
+      case 'completed':
+        return todos.filter(t => t.completed);
+      default:
+        return todos;
+    }
+  }
+
+  function render(): void {
+    const filtered = getFilteredTodos();
+    const activeCount = todos.filter(t => !t.completed).length;
+    const hasCompleted = todos.some(t => t.completed);
+
+    list.innerHTML = filtered
+      .map(
+        todo => `
+        <li class="todo-item flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r ${todo.color}
+                   shadow-lg transform transition-all hover:scale-[1.02]" data-id="${todo.id}">
+          <button class="toggle-btn flex-shrink-0 w-7 h-7 rounded-full border-3 border-white/50
+                         flex items-center justify-center transition-all hover:border-white
+                         ${todo.completed ? 'bg-white' : 'bg-transparent'}">
+            ${todo.completed ? '<svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>' : ''}
+          </button>
+          <span class="flex-1 text-white font-medium text-lg ${todo.completed ? 'line-through opacity-60' : ''}">
+            ${escapeHtml(todo.text)}
+          </span>
+          <button class="delete-btn w-8 h-8 rounded-full bg-white/20 hover:bg-red-500
+                         flex items-center justify-center transition-all hover:scale-110">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </li>
+      `
+      )
+      .join('');
+
+    emptyState.classList.toggle('hidden', filtered.length > 0);
+    footer.classList.toggle('hidden', todos.length === 0);
+    itemsLeft.textContent = `${activeCount} item${activeCount !== 1 ? 's' : ''} left`;
+    clearBtn.classList.toggle('hidden', !hasCompleted);
+  }
+
+  function escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function addTodo(text: string): void {
+    const todo: Todo = {
+      id: Date.now().toString(),
+      text: text.trim(),
+      completed: false,
+      color: getRandomColor(),
+    };
+    todos.unshift(todo);
+    saveTodos();
+    render();
+  }
+
+  function toggleTodo(id: string): void {
+    const todo = todos.find(t => t.id === id);
+    if (todo) {
+      todo.completed = !todo.completed;
+      saveTodos();
+      render();
+    }
+  }
+
+  function deleteTodo(id: string): void {
+    const item = list.querySelector(`[data-id="${id}"]`);
+    if (item) {
+      item.classList.add('removing');
+      setTimeout(() => {
+        todos = todos.filter(t => t.id !== id);
+        saveTodos();
+        render();
+      }, 300);
+    }
+  }
+
+  function clearCompleted(): void {
+    todos = todos.filter(t => !t.completed);
+    saveTodos();
+    render();
+  }
+
+  function setFilter(newFilter: 'all' | 'active' | 'completed'): void {
+    filter = newFilter;
+    filterBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-filter') === filter);
+    });
+    render();
+  }
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (text) {
+      addTodo(text);
+      input.value = '';
+    }
+  });
+
+  list.addEventListener('click', e => {
+    const target = e.target as HTMLElement;
+    const li = target.closest('li');
+    if (!li) return;
+
+    const id = li.getAttribute('data-id');
+    if (!id) return;
+
+    if (target.closest('.toggle-btn')) {
+      toggleTodo(id);
+    } else if (target.closest('.delete-btn')) {
+      deleteTodo(id);
+    }
+  });
+
+  clearBtn.addEventListener('click', clearCompleted);
+
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const f = btn.getAttribute('data-filter') as 'all' | 'active' | 'completed';
+      setFilter(f);
+    });
+  });
+
+  render();
+</script>
